@@ -7,6 +7,7 @@ import math
 import time
 
 import audiocore
+import audiomixer
 from adafruit_fruitjam.peripherals import Peripherals
 
 try:
@@ -41,6 +42,12 @@ print("%s: 1 s of audio in %.1f ms" % (KIND, (time.monotonic_ns() - t) / 1e6))
 
 fj = Peripherals(audio_output="headphone", sample_rate=SR)
 fj.volume = 0.7
-fj.audio.play(audiocore.RawSample(out, sample_rate=SR))
-while fj.audio.playing:
+# Play through a Mixer. RawSample straight to the DAC copies the whole clip into a small pool of
+# fast memory, which fails past about 1.9 s. A Mixer keeps that copy at buffer_size.
+mixer = audiomixer.Mixer(voice_count=1, buffer_size=8192, sample_rate=SR, channel_count=1,
+                         bits_per_sample=16, samples_signed=True)
+mixer.voice[0].level = 0.5
+fj.audio.play(mixer)
+mixer.voice[0].play(audiocore.RawSample(out, sample_rate=SR))
+while mixer.voice[0].playing:
     time.sleep(0.05)
